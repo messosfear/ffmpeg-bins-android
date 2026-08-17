@@ -1,30 +1,55 @@
-# This is a basic workflow to help you get started with Actions
+name: Build FFmpeg for Android aarch64
 
-name: CI
-
-# Controls when the workflow will run
 on:
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - main
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
-    # The type of runner that the job will run on
+  build-ffmpeg-arm64:
     runs-on: ubuntu-latest
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
+    env:
+      NDK_VERSION: r25b
+      ANDROID_API: "21"  # min API for arm64. Change if needed.
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
-
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
+      - name: Install build dependencies
         run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+          sudo apt-get update
+          sudo apt-get install -y \
+            autoconf automake build-essential cmake pkg-config \
+            yasm nasm git wget unzip libtool make
+
+      - name: Download Android NDK
+        run: |
+          set -euo pipefail
+          NDK_ZIP="android-ndk-${NDK_VERSION}-linux.zip"
+          NDK_URL="https://dl.google.com/android/repository/${NDK_ZIP}"
+          mkdir -p "${HOME}/android-ndk"
+          if [ ! -d "${HOME}/android-ndk/android-ndk-${NDK_VERSION}" ]; then
+            wget -q --show-progress "${NDK_URL}"
+            unzip -q "${NDK_ZIP}" -d "${HOME}/android-ndk"
+            rm "${NDK_ZIP}"
+          fi
+          echo "NDK at ${HOME}/android-ndk/android-ndk-${NDK_VERSION}"
+        shell: bash
+
+      - name: Build FFmpeg (Android aarch64)
+        run: |
+          chmod +x scripts/build-ffmpeg-android.sh
+          scripts/build-ffmpeg-android.sh \
+            --ndk "${HOME}/android-ndk/android-ndk-${NDK_VERSION}" \
+            --api "${ANDROID_API}"
+        shell: bash
+        env:
+          # allow script to use more CPU cores
+          MAKEFLAGS: "-j$(nproc)"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-android-aarch64
+          path: android-aarch64/bin/ffmpeg
