@@ -2,9 +2,6 @@ name: Build FFmpeg for Android aarch64
 
 on:
   workflow_dispatch: {}
-  push:
-    branches:
-      - main
 
 jobs:
   build-ffmpeg-arm64:
